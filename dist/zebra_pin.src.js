@@ -26,7 +26,7 @@
  *  @license    http://www.gnu.org/licenses/lgpl-3.0.txt GNU LESSER GENERAL PUBLIC LICENSE
  *  @package    Zebra_Pin
  */
-(function($) {
+ (function($) {
 
     'use strict';
 
@@ -34,6 +34,7 @@
 
         // so you can tell the version number even if all you have is the minified source
         this.version = '2.0.0';
+        var pluginUpdateTimeout=null;
 
         var defaults = {
 
@@ -57,6 +58,11 @@
                 //
                 //  default is 0
                 top_spacing: 0,
+
+                //  value, in pixels, that adjusts the point at which the element gets pinned. Can be positive or negative
+                //
+                //  default is 0
+                pinpoint_offset:0,
 
                 //  distance, in pixels, from the containing parent element's bottom which the pinned element must not
                 //  exceed.
@@ -111,10 +117,44 @@
                 // on window resize
                 $window.on('resize', function() {
 
-                    // update elements' position
-                    plugin.update();
-
+                              
+                    clearTimeout(pluginUpdateTimeout);
+                        pluginUpdateTimeout = setTimeout(function(){
+                        plugin.update();
+                    },50)
                 });
+
+
+
+                // Demo: http://jsfiddle.net/pFaSx/
+                // window.onresize isn't triggered when after JavaScript DOM manipulation page becomes high enough for appearing scrollbar.
+                // add a 100% width invisible iframe to the page and listen for resize events on it's internal window.
+                // Create an invisible iframe
+                if(!document.getElementById('hacky-scrollbar-resize-listener')){
+                    var iframe = document.createElement('iframe');
+                    iframe.id = "hacky-scrollbar-resize-listener";
+                    iframe.style.cssText = 'height: 0; opacity:0; background-color: transparent; margin: 0; padding: 0; overflow: hidden; border-width: 0; position: absolute; width: 100%;';
+    
+                    // Register our event when the iframe loads
+                    iframe.onload = function() {
+                    // The trick here is that because this iframe has 100% width 
+                    // it should fire a window resize event when anything causes it to 
+                    // resize (even scrollbars on the outer document)
+                    iframe.contentWindow.addEventListener('resize', function() {
+                        try {
+                        var evt = document.createEvent('UIEvents');
+                        evt.initUIEvent('resize', true, false, window, 0);
+                        window.dispatchEvent(evt);
+                        } catch(e) {}
+                    });
+                    };
+    
+                    // Stick the iframe somewhere out of the way
+                    document.body.appendChild(iframe);
+                }
+
+
+
 
             };
 
@@ -234,7 +274,7 @@
                         if (
 
                             // the user scrolled past the element's top (minus "top_spacing")
-                            scroll >= offset.top - plugin.settings.top_spacing &&
+                            scroll >= offset.top - plugin.settings.top_spacing + plugin.settings.pinpoint_offset   &&
 
                             // AND
                             (
@@ -262,11 +302,14 @@
 
                             // if element is *not* contained and at the bottom of its container
                             if (!$element.hasClass('Zebra_Pin_Contained')) {
-
                                 // create a clone of the element, insert it right after the original element and make it invisible
                                 // we do this so that we don't break the layout by removing the pinned element from the DOM
-                                $element.clone().addClass('Zebra_Pin_Clone').insertAfter($element).css('visibility', 'hidden');
-
+                                $element.clone().addClass('Zebra_Pin_Clone').insertAfter($element).css('visibility', 'hidden')
+                                    .attr('id',$element.attr('id')+'_Zebra_Clone')
+                                    .find('[id]').each(function(){
+                                        $(this).attr('id', $(this).attr('id')+'_Zebra_Clone')
+                                    });
+                                
                                 // save the element's "style" attribute as we are going to modify it
                                 // and add class indicating that the element is pinned
                                 $element.data('ztt_previous_style', $element.attr('style')).addClass(plugin.settings.class_name);
@@ -337,10 +380,13 @@
                             // if we didn't have the chance to initialize the pin
                             // (when the page doesn't start at the top)
                             if (!$element.hasClass(plugin.settings.class_name)) {
-
                                 // create a clone of the element, insert it right after the original element and make it invisible
                                 // we do this so that we don't break the layout by removing the pinned element from the DOM
-                                $element.clone().addClass('Zebra_Pin_Clone').insertAfter($element).css('visibility', 'hidden');
+                                $element.clone().addClass('Zebra_Pin_Clone').insertAfter($element).css('visibility', 'hidden')
+                                    .attr('id',$element.attr('id')+'_Zebra_Clone')
+                                    .find('[id]').each(function(){
+                                        $(this).attr('id', $(this).attr('id')+'_Zebra_Clone')
+                                    });
 
                                 // save the element's "style" attribute as we are going to modify it
                                 // and add class indicating that the element is pinned
